@@ -1,0 +1,47 @@
+{
+  "name": "cc-monitor",
+  "version": "1.0.0",
+  "description": "Local monitor for Claude Code API traffic, logs, prompts, and tools",
+  "type": "module",
+  "bin": {
+    "cc-monitor": "./bin/cc-monitor.js"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node --check bin/cc-monitor.js && node --check src/cli/service.js && node --check src/config/env.js && node --check src/config/target-discovery.js && node --check src/proxy/config.js && node --check src/proxy/server.js && node --check src/visualizer/server.js && node --check src/extractor/index.js && node --check src/extractor/cli.js"
+  },
+  "files": [
+    "assets/",
+    "bin/",
+    "src/",
+    "README.md",
+    "README.zh-CN.md",
+    "AGENTS.md"
+  ],
+  "keywords": [
+    "claude-code",
+    "monitor",
+    "observability",
+    "anthropic",
+    "proxy",
+    "prompts",
+    "tools"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ningzimu/cc-monitor.git"
+  },
+  "homepage": "https://github.com/ningzimu/cc-monitor#readme",
+  "bugs": {
+    "url": "https://github.com/ningzimu/cc-monitor/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "express": "^4.18.2"
+  }
+}

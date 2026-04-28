@@ -1,0 +1,408 @@
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import test from 'node:test';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.join(__dirname, '..');
+const proxyPath = path.join(repoRoot, 'src', 'proxy', 'server.js');
+
+function listen(server, port = 0) {
+  return new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', () => {
+      server.off('error', reject);
+      resolve(server.address().port);
+    });
+  });
+}
+
+function closeServer(server) {
+  return new Promise(resolve => server.close(resolve));
+}
+
+async function freePort() {
+  const server = http.createServer();
+  const port = await listen(server);
+  await closeServer(server);
+  return port;
+}
+
+async function waitForHttp(url, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(url);
+      if (response.status >= 200 && response.status < 500) {
+        return response;
+      }
+    } catch (error) {
+      // Retry until deadline.
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw new Error(`Timed out waiting for ${url}`);
+}
+
+async function readOnlyLogFile(logDir, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
+
+  while (Date.now() < deadline) {
+    try {
+      const files = await readdir(logDir);
+      if (files.length === 1) {
+        const content = await readFile(path.join(logDir, files[0]), 'utf8');
+        return {
+          files,
+          data: JSON.parse(content)
+        };
+      }
+    } catch (error) {
+      lastError = error;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
+  throw lastError || new Error(`Timed out waiting for one complete JSON log in ${logDir}`);
+}
+
+function requestJson(url, body) {
+  return new Promise((resolve, reject) => {
+    const requestBody = JSON.stringify(body);
+    const req = http.request(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(requestBody)
+      }
+    }, (res) => {
+      let responseBody = '';
+      res.on('data', chunk => {
+        responseBody += chunk.toString();
+      });
+      res.on('end', () => {
+        resolve({
+          statusCode: res.statusCode,
+          headers: res.headers,
+          body: JSON.parse(responseBody)
+        });
+      });
+    });
+
+    req.on('error', reject);
+    req.write(requestBody);
+    req.end();
+  });
+}
+
+function requestText(url, body) {
+  return new Promise((resolve, reject) => {
+    const requestBody = JSON.stringify(body);
+    const req = http.request(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(requestBody)
+      }
+    }, (res) => {
+      let responseBody = '';
+      res.on('data', chunk => {
+        responseBody += chunk.toString();
+      });
+      res.on('end', () => {
+        resolve({
+          statusCode: res.statusCode,
+          headers: res.headers,
+          body: responseBody
+        });
+      });
+    });
+
+    req.on('error', reject);
+    req.write(requestBody);
+    req.end();
+  });
+}
+
+function sseEvent(data) {
+  return `data: ${JSON.stringify(data)}\n\n`;
+}
+
+test('proxy preserves query strings and filters upstream length headers', async (t) => {
+  let upstreamRequest;
+  const upstream = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      upstreamRequest = {
+        method: req.method,
+        url: req.url,
+        headers: req.headers,
+        body: JSON.parse(body)
+      };
+
+      const responseBody = JSON.stringify({ ok: true, url: req.url });
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(responseBody),
+        'Connection': 'close',
+        'X-Upstream': 'ok'
+      });
+      res.end(responseBody);
+    });
+  });
+  const upstreamPort = await listen(upstream);
+  t.after(() => closeServer(upstream));
+
+  const proxyPort = await freePort();
+  const monitorHome = await mkdtemp(path.join(os.tmpdir(), 'claude-monitor-proxy-test-'));
+  t.after(() => rm(monitorHome, { recursive: true, force: true }));
+
+  const child = spawn(process.execPath, [proxyPath], {
+    cwd: repoRoot,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      CLAUDE_MONITOR_HOME: monitorHome,
+      CLAUDE_MONITOR_PROXY_PORT: String(proxyPort),
+      CLAUDE_MONITOR_TARGET_BASE_URL: `http://127.0.0.1:${upstreamPort}`
+    }
+  });
+  t.after(() => child.kill('SIGTERM'));
+
+  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-monitor/health`);
+
+  const response = await requestJson(
+    `http://127.0.0.1:${proxyPort}/v1/messages?beta=true&n=1`,
+    { stream: false, messages: [{ role: 'user', content: 'hello' }] }
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers['x-upstream'], 'ok');
+  assert.equal(response.headers['content-length'], undefined);
+  assert.equal(upstreamRequest.url, '/v1/messages?beta=true&n=1');
+  assert.equal(upstreamRequest.headers.host, `127.0.0.1:${upstreamPort}`);
+  assert.deepEqual(upstreamRequest.body.messages, [{ role: 'user', content: 'hello' }]);
+});
+
+test('proxy groups logs by JSON metadata session_id', async (t) => {
+  const upstream = http.createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      const responseBody = JSON.stringify({ id: 'msg_test', type: 'message', content: [] });
+      res.writeHead(200, {
+        'Content-Type': 'application/json'
+      });
+      res.end(responseBody);
+    });
+  });
+  const upstreamPort = await listen(upstream);
+  t.after(() => closeServer(upstream));
+
+  const proxyPort = await freePort();
+  const monitorHome = await mkdtemp(path.join(os.tmpdir(), 'claude-monitor-session-test-'));
+  t.after(() => rm(monitorHome, { recursive: true, force: true }));
+
+  const child = spawn(process.execPath, [proxyPath], {
+    cwd: repoRoot,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      CLAUDE_MONITOR_HOME: monitorHome,
+      CLAUDE_MONITOR_PROXY_PORT: String(proxyPort),
+      CLAUDE_MONITOR_TARGET_BASE_URL: `http://127.0.0.1:${upstreamPort}`
+    }
+  });
+  t.after(() => child.kill('SIGTERM'));
+
+  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-monitor/health`);
+
+  const sessionId = '7342f1a7-c287-4039-b26e-2a3481ca98a7';
+  await requestJson(
+    `http://127.0.0.1:${proxyPort}/v1/messages?beta=true`,
+    {
+      stream: false,
+      metadata: {
+        user_id: JSON.stringify({
+          device_id: 'device-test',
+          account_uuid: '',
+          session_id: sessionId
+        })
+      },
+      messages: [{ role: 'user', content: 'hello' }]
+    }
+  );
+
+  const rawLogDir = path.join(monitorHome, 'raw_logs');
+  const { files, data: logData } = await readOnlyLogFile(rawLogDir);
+  assert.equal(files.length, 1);
+  assert.match(files[0], /-7342f1a7\.json$/);
+
+  assert.equal(logData.session_id, sessionId);
+});
+
+test('proxy discovers target base URL from Claude Code project settings', async (t) => {
+  const upstream = http.createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      const responseBody = JSON.stringify({ ok: true, upstreamUrl: req.url });
+      res.writeHead(200, {
+        'Content-Type': 'application/json'
+      });
+      res.end(responseBody);
+    });
+  });
+  const upstreamPort = await listen(upstream);
+  t.after(() => closeServer(upstream));
+
+  const proxyPort = await freePort();
+  const monitorHome = await mkdtemp(path.join(os.tmpdir(), 'claude-monitor-discovery-home-'));
+  const projectDir = await mkdtemp(path.join(os.tmpdir(), 'claude-monitor-discovery-project-'));
+  t.after(() => rm(monitorHome, { recursive: true, force: true }));
+  t.after(() => rm(projectDir, { recursive: true, force: true }));
+
+  await mkdir(path.join(projectDir, '.claude'), { recursive: true });
+  await writeFile(
+    path.join(projectDir, '.claude', 'settings.local.json'),
+    JSON.stringify({
+      env: {
+        ANTHROPIC_BASE_URL: `http://127.0.0.1:${upstreamPort}`
+      }
+    })
+  );
+
+  const child = spawn(process.execPath, [proxyPath], {
+    cwd: projectDir,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      CLAUDE_MONITOR_HOME: monitorHome,
+      CLAUDE_MONITOR_PROXY_PORT: String(proxyPort),
+      CLAUDE_MONITOR_TARGET_BASE_URL: '',
+      ANTHROPIC_BASE_URL: ''
+    }
+  });
+  t.after(() => child.kill('SIGTERM'));
+
+  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-monitor/health`);
+
+  const response = await requestJson(
+    `http://127.0.0.1:${proxyPort}/v1/messages?discovered=true`,
+    { stream: false, messages: [{ role: 'user', content: 'hello' }] }
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.body, {
+    ok: true,
+    upstreamUrl: '/v1/messages?discovered=true'
+  });
+});
+
+test('proxy preserves streamed tool_use blocks when SSE events are split across chunks', async (t) => {
+  const streamPayload = [
+    sseEvent({
+      type: 'message_start',
+      message: {
+        id: 'msg_test',
+        type: 'message',
+        role: 'assistant',
+        model: 'test-model',
+        content: []
+      }
+    }),
+    sseEvent({
+      type: 'content_block_start',
+      index: 0,
+      content_block: {
+        type: 'tool_use',
+        id: 'toolu_test',
+        name: 'Bash',
+        input: {}
+      }
+    }),
+    sseEvent({
+      type: 'content_block_delta',
+      index: 0,
+      delta: {
+        type: 'input_json_delta',
+        partial_json: '{"command":"echo hi"}'
+      }
+    }),
+    sseEvent({ type: 'content_block_stop', index: 0 }),
+    sseEvent({
+      type: 'message_delta',
+      delta: { stop_reason: 'tool_use' },
+      usage: { output_tokens: 2 }
+    }),
+    sseEvent({ type: 'message_stop' })
+  ].join('');
+
+  const upstream = http.createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream'
+      });
+
+      const firstEventEnd = streamPayload.indexOf('\n\n') + 2;
+      const splitAt = firstEventEnd + 'data: '.length;
+      res.write(streamPayload.slice(0, splitAt));
+      setTimeout(() => {
+        res.end(streamPayload.slice(splitAt));
+      }, 10);
+    });
+  });
+  const upstreamPort = await listen(upstream);
+  t.after(() => closeServer(upstream));
+
+  const proxyPort = await freePort();
+  const monitorHome = await mkdtemp(path.join(os.tmpdir(), 'claude-monitor-stream-test-'));
+  t.after(() => rm(monitorHome, { recursive: true, force: true }));
+
+  const child = spawn(process.execPath, [proxyPath], {
+    cwd: repoRoot,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      CLAUDE_MONITOR_HOME: monitorHome,
+      CLAUDE_MONITOR_PROXY_PORT: String(proxyPort),
+      CLAUDE_MONITOR_TARGET_BASE_URL: `http://127.0.0.1:${upstreamPort}`
+    }
+  });
+  t.after(() => child.kill('SIGTERM'));
+
+  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-monitor/health`);
+
+  const sessionId = '123e4567-e89b-12d3-a456-426614174001';
+  const response = await requestText(
+    `http://127.0.0.1:${proxyPort}/v1/messages`,
+    {
+      stream: true,
+      metadata: { session_id: sessionId },
+      messages: [{ role: 'user', content: 'use tool' }]
+    }
+  );
+
+  assert.equal(response.statusCode, 200);
+
+  const { files, data: logData } = await readOnlyLogFile(path.join(monitorHome, 'raw_logs'));
+  assert.equal(files.length, 1);
+
+  const final = logData.interactions.find(interaction => interaction.type === 'stream.final');
+  const block = final?.data?.content?.[0];
+
+  assert.deepEqual(block, {
+    type: 'tool_use',
+    id: 'toolu_test',
+    name: 'Bash',
+    input: { command: 'echo hi' }
+  });
+});
