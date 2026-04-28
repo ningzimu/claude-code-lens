@@ -1976,6 +1976,7 @@
     const state = {
       data: null,
       index: 0,
+      currentLogUrl: null,
       promptMap: {},            // id -> text
       promptCounts: {},         // id -> count
       toolDefs: {},             // key -> def
@@ -3123,6 +3124,7 @@
       const conv = state.data.conversations[state.index];
       renderInput(conv);
       renderOutput(conv);
+      saveCurrentLogIndex();
     }
 
     firstBtn.onclick = () => setIndex(0);
@@ -3146,6 +3148,43 @@
 
     // -------- Load log files list --------
     const SELECT_FILE_VALUE = '__select_file__';
+    const SELECTED_LOG_KEY = 'selectedLog';
+    const LOG_INDEX_KEY_PREFIX = 'selectedLogIndex:';
+
+    function logIndexKey(url) {
+      return `${LOG_INDEX_KEY_PREFIX}${url}`;
+    }
+
+    function readStoredIndex(url) {
+      if (!url) return null;
+      try {
+        const value = localStorage.getItem(logIndexKey(url));
+        if (value == null) return null;
+        const index = parseInt(value, 10);
+        return Number.isFinite(index) && index >= 0 ? index : null;
+      } catch (e) {
+        console.warn('[Visualizer] Failed to read saved request index:', e);
+        return null;
+      }
+    }
+
+    function saveSelectedLog(url) {
+      if (!url || url === SELECT_FILE_VALUE) return;
+      try {
+        localStorage.setItem(SELECTED_LOG_KEY, url);
+      } catch (e) {
+        console.warn('[Visualizer] Failed to save selected log:', e);
+      }
+    }
+
+    function saveCurrentLogIndex() {
+      if (!state.currentLogUrl) return;
+      try {
+        localStorage.setItem(logIndexKey(state.currentLogUrl), String(state.index));
+      } catch (e) {
+        console.warn('[Visualizer] Failed to save request index:', e);
+      }
+    }
 
     function normalizeLogFiles(logFiles) {
       if (!Array.isArray(logFiles)) return [];
@@ -3218,13 +3257,13 @@
         targetPath = selectLogPathFromList(normalizedLogs, preferredPath);
       } else {
         try {
-          const savedLog = localStorage.getItem('selectedLog');
+          const savedLog = localStorage.getItem(SELECTED_LOG_KEY);
           if (savedLog && savedLog !== '__file_input__') {
             targetPath = selectLogPathFromList(normalizedLogs, savedLog);
             if (targetPath) {
               console.log('[Visualizer] Restored selection from localStorage:', targetPath.split('/').pop());
             } else {
-              localStorage.removeItem('selectedLog');
+              localStorage.removeItem(SELECTED_LOG_KEY);
               console.log('[Visualizer] Saved log file not found, cleared localStorage');
             }
           }
@@ -3255,8 +3294,8 @@
     async function loadLogFile(url, preservePosition = false) {
       if (!url) return;
 
-      // Remember current position if preserving
-      const previousIndex = preservePosition ? state.index : 0;
+      // Remember current position if preserving the already selected file.
+      const previousIndex = preservePosition && state.currentLogUrl === url ? state.index : null;
 
       try {
         const response = await fetch(url);
@@ -3280,8 +3319,12 @@
         const total = (json.conversations || []).length;
         metaInfoEl.textContent = '';
 
-        // Preserve position when reloading the same file, clamp to valid range
-        const targetIndex = preservePosition ? Math.min(previousIndex, total - 1) : 0;
+        state.currentLogUrl = url;
+        saveSelectedLog(url);
+
+        // Preserve live reload position, otherwise restore this log file's saved request index.
+        const storedIndex = readStoredIndex(url);
+        const targetIndex = Math.min(previousIndex ?? storedIndex ?? 0, total - 1);
         setIndex(targetIndex);
       } catch (err) {
         console.error('Failed to load log file:', err);
@@ -3350,7 +3393,7 @@
               
               // Save to localStorage
               try {
-                localStorage.setItem('selectedLog', newPath);
+                localStorage.setItem(SELECTED_LOG_KEY, newPath);
               } catch (e) {
                 console.warn('[SSE] Failed to save to localStorage:', e);
               }
@@ -3398,7 +3441,7 @@
 
         // Save selection to localStorage
         try {
-          localStorage.setItem('selectedLog', value);
+          localStorage.setItem(SELECTED_LOG_KEY, value);
           console.log('[Visualizer] Saved selection to localStorage:', value);
         } catch (e) {
           console.warn('[Visualizer] Failed to save to localStorage:', e);
@@ -3434,6 +3477,7 @@
         const total = (json.conversations || []).length;
         metaInfoEl.textContent = '';
 
+        state.currentLogUrl = null;
         setIndex(0);
 
         // Keep dropdown at "Select file..." after loading from file input
@@ -3441,7 +3485,7 @@
 
         // Mark this session as file input (don't restore on refresh)
         try {
-          localStorage.setItem('selectedLog', '__file_input__');
+          localStorage.setItem(SELECTED_LOG_KEY, '__file_input__');
           console.log('[Visualizer] File input loaded, localStorage set to __file_input__');
         } catch (e) {
           console.warn('[Visualizer] Failed to save to localStorage:', e);

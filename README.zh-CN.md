@@ -1,6 +1,6 @@
 # Claude Code Lens
 
-[![English](https://img.shields.io/badge/README-English-blue.svg)](./README.md)
+[![npm](https://img.shields.io/npm/v/claude-code-lens.svg)](https://www.npmjs.com/package/claude-code-lens) [![English](https://img.shields.io/badge/README-English-blue.svg)](./README.md)
 
 Claude Code Lens 是一个本地 Claude Code 可观测工具：它在 Claude Code 和真实 Anthropic-compatible 服务之间放一个本地代理，记录每次请求里的 system prompt、messages、tool definitions、tool calls、streaming response 和 token usage，并提供浏览器页面查看。
 

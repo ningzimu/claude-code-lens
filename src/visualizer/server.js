@@ -210,7 +210,7 @@ async function startBuiltinServer() {
   const server = createServer(async (req, res) => {
     let filePath;
 
-    if (req.url === '/__claude-monitor/health') {
+    if (req.url === '/__claude-code-lens/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true }));
       return;
@@ -365,7 +365,7 @@ async function main() {
   if (!IS_BACKGROUND_SERVER) {
     const url = `http://localhost:${PORT}`;
 
-    if (await waitForHttp(`http://127.0.0.1:${PORT}/__claude-monitor/health`, 1000)) {
+    if (await waitForHttp(`http://127.0.0.1:${PORT}/__claude-code-lens/health`, 1000)) {
       console.log(`${colors.green}✅ Visualizer is already running${colors.reset}`);
       console.log(`${colors.blue}→ URL: ${url}${colors.reset}`);
       openBrowser(url);
@@ -395,7 +395,7 @@ async function main() {
     child.unref();
 
     console.log(`${colors.green}✅ Visualizer started in background (PID: ${child.pid})${colors.reset}`);
-    const isReady = await waitForHttp(`http://127.0.0.1:${PORT}/__claude-monitor/health`, 5000);
+    const isReady = await waitForHttp(`http://127.0.0.1:${PORT}/__claude-code-lens/health`, 5000);
     if (!isReady) {
       console.error(`${colors.yellow}❌ Visualizer did not pass health check${colors.reset}`);
       process.exit(1);

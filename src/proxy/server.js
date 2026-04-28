@@ -345,7 +345,7 @@ function handleStreamResponse(proxyRes, res, uid, resInfo, loggerCtx) {
 }
 
 // 处理所有路由
-app.get('/__claude-monitor/health', (req, res) => {
+app.get('/__claude-code-lens/health', (req, res) => {
   res.json({ ok: true });
 });
 

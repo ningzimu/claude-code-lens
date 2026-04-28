@@ -178,7 +178,7 @@ test('proxy preserves query strings and filters upstream length headers', async 
   });
   t.after(() => child.kill('SIGTERM'));
 
-  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-monitor/health`);
+  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-code-lens/health`);
 
   const response = await requestJson(
     `http://127.0.0.1:${proxyPort}/v1/messages?beta=true&n=1`,
@@ -223,7 +223,7 @@ test('proxy groups logs by JSON metadata session_id', async (t) => {
   });
   t.after(() => child.kill('SIGTERM'));
 
-  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-monitor/health`);
+  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-code-lens/health`);
 
   const sessionId = '7342f1a7-c287-4039-b26e-2a3481ca98a7';
   await requestJson(
@@ -292,7 +292,7 @@ test('proxy discovers target base URL from Claude Code project settings', async 
   });
   t.after(() => child.kill('SIGTERM'));
 
-  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-monitor/health`);
+  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-code-lens/health`);
 
   const response = await requestJson(
     `http://127.0.0.1:${proxyPort}/v1/messages?discovered=true`,
@@ -379,7 +379,7 @@ test('proxy preserves streamed tool_use blocks when SSE events are split across 
   });
   t.after(() => child.kill('SIGTERM'));
 
-  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-monitor/health`);
+  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-code-lens/health`);
 
   const sessionId = '123e4567-e89b-12d3-a456-426614174001';
   const response = await requestText(

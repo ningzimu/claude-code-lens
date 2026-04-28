@@ -374,7 +374,7 @@ async function proxySubcommand() {
   // Save PID
   fs.writeFileSync(PID_FILE, child.pid.toString());
 
-  const healthUrl = `http://127.0.0.1:${port}/__claude-monitor/health`;
+  const healthUrl = `http://127.0.0.1:${port}/__claude-code-lens/health`;
   const isReady = await waitForHttp(healthUrl, 5000);
 
   // Verify startup
@@ -724,7 +724,7 @@ async function startVisualizer() {
 
   const visualizerPort = getVisualizerPort();
   const url = `http://127.0.0.1:${visualizerPort}`;
-  if (await waitForHttp(`${url}/__claude-monitor/health`, 1000)) {
+  if (await waitForHttp(`${url}/__claude-code-lens/health`, 1000)) {
     return {
       pid: fs.existsSync(VISUALIZER_PID_FILE) ? fs.readFileSync(VISUALIZER_PID_FILE, 'utf-8').trim() : 'unknown',
       url,
@@ -756,7 +756,7 @@ async function startVisualizer() {
     child.unref();
     fs.writeFileSync(VISUALIZER_PID_FILE, child.pid.toString());
 
-    const isReady = await waitForHttp(`${url}/__claude-monitor/health`, 5000);
+    const isReady = await waitForHttp(`${url}/__claude-code-lens/health`, 5000);
     if (!isReady || !isProcessRunning(child.pid)) {
       console.log(`${colors.yellow}⚠️  可视化工具启动后未通过健康检查,请查看日志: ${VISUALIZER_LOG_FILE}${colors.reset}`);
       return null;
@@ -944,14 +944,14 @@ async function defaultStartup(claudeExtraArgs) {
   const quiet = isPrintMode(claudeExtraArgs) && !MONITOR_VERBOSE;
 
   if (!quiet) {
-    monitorLog(`${colors.bold}Claude Monitor${colors.reset}`);
+    monitorLog(`${colors.bold}Claude Code Lens${colors.reset}`);
   }
 
   try {
     // Step 1: Port management
     verboseLog(`${colors.cyan}[1/4]${colors.reset} Checking port...`);
     const startPort = getPort();
-    const existingHealthUrl = `http://127.0.0.1:${startPort}/__claude-monitor/health`;
+    const existingHealthUrl = `http://127.0.0.1:${startPort}/__claude-code-lens/health`;
     const existingProxyReady = await waitForHttp(existingHealthUrl, 1000);
     const port = existingProxyReady ? startPort : await findAvailablePort(startPort);
     const target = discoverTargetBaseUrl({
@@ -975,7 +975,7 @@ async function defaultStartup(claudeExtraArgs) {
       };
     } else {
       proxyInfo = startProxyServer(port, target.baseUrl);
-      const proxyHealthUrl = `http://127.0.0.1:${port}/__claude-monitor/health`;
+      const proxyHealthUrl = `http://127.0.0.1:${port}/__claude-code-lens/health`;
       const proxyReady = await waitForHttp(proxyHealthUrl, 5000);
 
       if (!proxyReady || !isProcessRunning(proxyInfo.pid)) {

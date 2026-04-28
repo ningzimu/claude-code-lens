@@ -71,7 +71,7 @@ test('visualizer server reads port from monitor config', async (t) => {
   });
   t.after(() => child.kill('SIGTERM'));
 
-  const response = await waitForHttp(`http://127.0.0.1:${port}/__claude-monitor/health`);
+  const response = await waitForHttp(`http://127.0.0.1:${port}/__claude-code-lens/health`);
   assert.equal(response.status, 200);
 });
 
