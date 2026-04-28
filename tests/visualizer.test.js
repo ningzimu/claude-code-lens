@@ -4,12 +4,13 @@ import { mkdir, mkdtemp, utimes, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, '..');
 const visualizerPath = path.join(repoRoot, 'src', 'visualizer', 'server.js');
+const reloadPositionPath = path.join(repoRoot, 'src', 'visualizer', 'public', 'reload-position.js');
 
 function listen(server, port = 0) {
   return new Promise((resolve, reject) => {
@@ -104,4 +105,32 @@ test('visualizer log API sorts files by modified time descending', async (t) => 
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.deepEqual(body.logs.map(log => log.name), ['new.json', 'old.json']);
+});
+
+test('visualizer live reload follows newest request only when already at latest', async () => {
+  await import(`${pathToFileURL(reloadPositionPath).href}?cache=${Date.now()}`);
+  const { normalizeLoadOptions, resolveTargetIndex } = globalThis.CCLensReloadPosition;
+  const options = normalizeLoadOptions({ preservePosition: true });
+
+  assert.equal(resolveTargetIndex({
+    total: 15,
+    options,
+    previousIndex: 13,
+    previousTotal: 14,
+    storedIndex: 6
+  }), 14);
+
+  assert.equal(resolveTargetIndex({
+    total: 15,
+    options,
+    previousIndex: 6,
+    previousTotal: 14,
+    storedIndex: 6
+  }), 6);
+
+  assert.equal(resolveTargetIndex({
+    total: 15,
+    options: normalizeLoadOptions({ preferLatest: true }),
+    storedIndex: 6
+  }), 14);
 });

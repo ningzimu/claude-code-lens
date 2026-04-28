@@ -256,6 +256,90 @@ test('proxy groups logs by JSON metadata session_id', async (t) => {
   assert.equal(logData.session_id, sessionId);
 });
 
+test('proxy creates one raw log per distinct Claude session_id', async (t) => {
+  const upstream = http.createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      const responseBody = JSON.stringify({ id: 'msg_test', type: 'message', content: [] });
+      res.writeHead(200, {
+        'Content-Type': 'application/json'
+      });
+      res.end(responseBody);
+    });
+  });
+  const upstreamPort = await listen(upstream);
+  t.after(() => closeServer(upstream));
+
+  const proxyPort = await freePort();
+  const monitorHome = await mkdtemp(path.join(os.tmpdir(), 'claude-monitor-multi-session-test-'));
+  t.after(() => rm(monitorHome, { recursive: true, force: true }));
+
+  const child = spawn(process.execPath, [proxyPath], {
+    cwd: repoRoot,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      CLAUDE_CODE_LENS_HOME: monitorHome,
+      CLAUDE_CODE_LENS_PROXY_PORT: String(proxyPort),
+      CLAUDE_CODE_LENS_TARGET_BASE_URL: `http://127.0.0.1:${upstreamPort}`
+    }
+  });
+  t.after(() => child.kill('SIGTERM'));
+
+  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-code-lens/health`);
+
+  const sessionA = '11111111-1111-4111-8111-111111111111';
+  const sessionB = '22222222-2222-4222-8222-222222222222';
+
+  await requestJson(
+    `http://127.0.0.1:${proxyPort}/v1/messages`,
+    {
+      stream: false,
+      metadata: { session_id: sessionA },
+      messages: [{ role: 'user', content: 'first session request 1' }]
+    }
+  );
+  await requestJson(
+    `http://127.0.0.1:${proxyPort}/v1/messages`,
+    {
+      stream: false,
+      metadata: { session_id: sessionA },
+      messages: [{ role: 'user', content: 'first session request 2' }]
+    }
+  );
+  await requestJson(
+    `http://127.0.0.1:${proxyPort}/v1/messages`,
+    {
+      stream: false,
+      metadata: { session_id: sessionB },
+      messages: [{ role: 'user', content: 'second session request' }]
+    }
+  );
+
+  const rawLogDir = path.join(monitorHome, 'raw_logs');
+  const deadline = Date.now() + 5000;
+  let files = [];
+  while (Date.now() < deadline) {
+    files = (await readdir(rawLogDir)).filter(file => file.endsWith('.json')).sort();
+    if (files.length === 2) break;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
+  assert.equal(files.length, 2);
+  assert.equal(files.some(file => file.endsWith('-11111111.json')), true);
+  assert.equal(files.some(file => file.endsWith('-22222222.json')), true);
+
+  const sessionAFile = files.find(file => file.endsWith('-11111111.json'));
+  const sessionBFile = files.find(file => file.endsWith('-22222222.json'));
+  const sessionALog = JSON.parse(await readFile(path.join(rawLogDir, sessionAFile), 'utf8'));
+  const sessionBLog = JSON.parse(await readFile(path.join(rawLogDir, sessionBFile), 'utf8'));
+
+  assert.equal(sessionALog.session_id, sessionA);
+  assert.equal(sessionBLog.session_id, sessionB);
+  assert.equal(sessionALog.interactions.filter(item => item.type === 'input').length, 2);
+  assert.equal(sessionBLog.interactions.filter(item => item.type === 'input').length, 1);
+});
+
 test('proxy discovers target base URL from Claude Code project settings', async (t) => {
   const upstream = http.createServer((req, res) => {
     req.resume();

@@ -1506,6 +1506,14 @@
       border-color: var(--accent-deep);
     }
     .btn.copy:hover { background: var(--accent-deep); }
+    .btn.copy.copied {
+      background: var(--green);
+      border-color: var(--green);
+    }
+    .btn.copy.failed {
+      background: var(--amber);
+      border-color: var(--amber);
+    }
 
     /* ============ misc ============ */
     .hidden { display: none !important; }
@@ -1971,6 +1979,7 @@
 
   <!-- Your browser-side parser must provide: window.parseConversationLog(logString) -->
   <script src="./parser.js"></script>
+  <script src="./reload-position.js"></script>
   <script>
     // -------- State --------
     const state = {
@@ -2023,19 +2032,64 @@
     // -------- Modal helpers --------
     const modal = el('modal'), modalTitle = el('modalTitle'), modalBody = el('modalBody'),
       closeBtn = el('closeBtn'), copyBtn = el('copyBtn');
+    let copyFeedbackTimer = null;
     closeBtn.onclick = () => modal.classList.remove('open');
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') modal.classList.remove('open'); });
-    copyBtn.onclick = () => {
+    function setCopyFeedback(status) {
+      if (copyFeedbackTimer) {
+        clearTimeout(copyFeedbackTimer);
+      }
+
+      copyBtn.classList.remove('copied', 'failed');
+      copyBtn.classList.add(status);
+      copyBtn.textContent = status === 'copied' ? 'Copied' : 'Copy failed';
+
+      copyFeedbackTimer = setTimeout(() => {
+        copyBtn.classList.remove('copied', 'failed');
+        copyBtn.textContent = 'Copy';
+        copyFeedbackTimer = null;
+      }, 1400);
+    }
+    function copyModalSelectionFallback() {
       const sel = document.getSelection();
       const range = document.createRange();
       range.selectNodeContents(modalBody);
       sel.removeAllRanges();
       sel.addRange(range);
-      try { document.execCommand('copy'); } catch { }
+      let copied = false;
+      try {
+        copied = document.execCommand('copy');
+      } catch {
+        copied = false;
+      }
       sel.removeAllRanges();
+      return copied;
+    }
+    copyBtn.onclick = async () => {
+      let copied = false;
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(modalBody.innerText || modalBody.textContent || '');
+          copied = true;
+        }
+      } catch {
+        copied = false;
+      }
+
+      if (!copied) {
+        copied = copyModalSelectionFallback();
+      }
+
+      setCopyFeedback(copied ? 'copied' : 'failed');
     };
     function openModal(title, contentNode) {
+      if (copyFeedbackTimer) {
+        clearTimeout(copyFeedbackTimer);
+        copyFeedbackTimer = null;
+      }
+      copyBtn.classList.remove('copied', 'failed');
+      copyBtn.textContent = 'Copy';
       modalTitle.textContent = title;
       modalBody.innerHTML = '';
       modalBody.appendChild(contentNode);
@@ -2371,11 +2425,6 @@
         });
         desc.textContent = activeDef.description || '(no description)';
         meta.innerHTML = '';
-        const idBadge = document.createElement('span');
-        idBadge.className = 'badge';
-        idBadge.textContent = activeKey;
-        idBadge.title = 'Internal tool definition id';
-        meta.appendChild(idBadge);
         if (keys.length > 1) {
           const compare = document.createElement('button');
           compare.type = 'button';
@@ -3334,14 +3383,30 @@
       };
     }
 
-    async function loadLogFile(url, preservePosition = false) {
+    function normalizeLoadOptions(optionsOrPreserve = false) {
+      return window.CCLensReloadPosition.normalizeLoadOptions(optionsOrPreserve);
+    }
+
+    function resolveTargetIndex(url, total, options, previousIndex, previousTotal) {
+      return window.CCLensReloadPosition.resolveTargetIndex({
+        total,
+        options,
+        previousIndex,
+        previousTotal,
+        storedIndex: readStoredIndex(url)
+      });
+    }
+
+    async function loadLogFile(url, optionsOrPreserve = false) {
       if (!url) return;
+      const options = normalizeLoadOptions(optionsOrPreserve);
       if (isLocalFileValue(url)) {
-        return loadLocalLogFile(url, preservePosition);
+        return loadLocalLogFile(url, options);
       }
 
       // Remember current position if preserving the already selected file.
-      const previousIndex = preservePosition && state.currentLogUrl === url ? state.index : null;
+      const previousIndex = options.preservePosition && state.currentLogUrl === url ? state.index : null;
+      const previousTotal = previousIndex !== null ? (state.data?.conversations || []).length : null;
 
       try {
         const response = await fetch(url);
@@ -3368,9 +3433,8 @@
         state.currentLogUrl = url;
         saveSelectedLog(url);
 
-        // Preserve live reload position, otherwise restore this log file's saved request index.
-        const storedIndex = readStoredIndex(url);
-        const targetIndex = Math.min(previousIndex ?? storedIndex ?? 0, total - 1);
+        // Live reload follows the newest request only when the user was already at the newest request.
+        const targetIndex = resolveTargetIndex(url, total, options, previousIndex, previousTotal);
         setIndex(targetIndex);
       } catch (err) {
         console.error('Failed to load log file:', err);
@@ -3378,14 +3442,16 @@
       }
     }
 
-    async function loadLocalLogFile(value, preservePosition = false) {
+    async function loadLocalLogFile(value, optionsOrPreserve = false) {
+      const options = normalizeLoadOptions(optionsOrPreserve);
       const file = state.localFiles.get(value);
       if (!file) {
         alert('Local file is no longer available. Please select it again.');
         return;
       }
 
-      const previousIndex = preservePosition && state.currentLogUrl === value ? state.index : null;
+      const previousIndex = options.preservePosition && state.currentLogUrl === value ? state.index : null;
+      const previousTotal = previousIndex !== null ? (state.data?.conversations || []).length : null;
 
       try {
         if (typeof window.parseConversationLog !== 'function') {
@@ -3402,8 +3468,7 @@
         metaInfoEl.textContent = '';
 
         state.currentLogUrl = value;
-        const storedIndex = readStoredIndex(value);
-        const targetIndex = Math.min(previousIndex ?? storedIndex ?? 0, total - 1);
+        const targetIndex = resolveTargetIndex(value, total, options, previousIndex, previousTotal);
         setIndex(targetIndex);
       } catch (err) {
         console.error('Failed to load local log file:', err);
@@ -3449,14 +3514,14 @@
             const newPath = `/logs/${updatedFile}`;
             
             if (updatedFile === currentFile) {
-              // Current file was updated, reload it while preserving reading position
-              console.log('[SSE] Current file updated, reloading while preserving position...');
+              // Current file was updated. Follow latest only if the user was already reading latest.
+              console.log('[SSE] Current file updated, reloading with smart latest-follow behavior...');
               await loadLogFiles({
                 preferredPath: logSelect.value,
                 loadSelected: false
               });
               logSelect.value = newPath;
-              await loadLogFile(newPath, true);
+              await loadLogFile(newPath, { preservePosition: true });
             } else {
               // A different file was updated, switch to it and keep the file list sorted by mtime
               console.log('[SSE] Switching to updated file:', updatedFile);
@@ -3477,8 +3542,8 @@
                 console.warn('[SSE] Failed to save to localStorage:', e);
               }
               
-              // Load the updated file (start from beginning for new file)
-              await loadLogFile(newPath, false);
+              // Load the updated file at its newest request.
+              await loadLogFile(newPath, { preferLatest: true });
             }
           }
         } catch (err) {
