@@ -4,7 +4,7 @@
   "description": "Local monitor for Claude Code API traffic, logs, prompts, and tools",
   "type": "module",
   "bin": {
-    "cc-monitor": "./bin/cc-monitor.js"
+    "cc-monitor": "bin/cc-monitor.js"
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
