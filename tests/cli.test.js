@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import test from 'node:test';
+import { buildClaudeArgs } from '../src/cli/service.js';
 
 const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -25,6 +26,17 @@ test('cclens help exposes the unified command surface', async () => {
   assert.match(stdout, /viz\s+Start\/open the browser log visualizer/);
   assert.match(stdout, /extract \[log-file\]\s+Extract prompts\/tools from a log file/);
   assert.match(stdout, /cclens proxy --help/);
+});
+
+test('cclens passthrough uses the generated monitor settings file by default', () => {
+  const args = buildClaudeArgs(['-p', 'hello']);
+  assert.deepEqual(args.slice(0, 2), ['-p', 'hello']);
+  assert.equal(args[2], '--settings');
+  assert.match(args[3], /\.claude-code-lens\/settings\.json$/);
+  assert.deepEqual(
+    buildClaudeArgs(['--settings', '/tmp/custom-settings.json', '--resume']),
+    ['--settings', '/tmp/custom-settings.json', '--resume']
+  );
 });
 
 test('monitor subcommands provide detailed help', async () => {

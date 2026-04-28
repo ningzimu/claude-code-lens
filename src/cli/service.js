@@ -841,7 +841,7 @@ function checkClaudeInstalled() {
 }
 
 /**
- * Build Claude args with settings file
+ * Build Claude args with the monitor settings file unless the user provided one.
  */
 function buildClaudeArgs(args) {
   const result = [];
@@ -869,12 +869,11 @@ function buildClaudeArgs(args) {
     }
   }
 
-  // 如果用户没有提供 --settings,使用配置文件
   if (!hasSettings) {
     result.push('--settings', SETTINGS_FILE);
   } else {
     console.log(`${colors.yellow}⚠️  用户提供了自定义 --settings 参数${colors.reset}`);
-    console.log(`${colors.yellow}   代理可能不会生效!${colors.reset}`);
+    console.log(`${colors.yellow}   cclens 会继续通过环境变量注入代理地址,但自定义 settings 可能覆盖它。${colors.reset}`);
   }
 
   return result;
@@ -988,6 +987,8 @@ async function defaultStartup(claudeExtraArgs) {
     verboseLog(`${colors.blue}Proxy PID: ${proxyInfo.pid}${colors.reset}`);
     verboseLog(`${colors.blue}Proxy log: ${proxyInfo.logPath}${colors.reset}`);
 
+    updateSettingsFile(port);
+
     // Step 3: Start visualizer
     verboseLog(`${colors.cyan}[3/4]${colors.reset} Starting visualizer...`);
     const vizInfo = await startVisualizer();
@@ -1035,6 +1036,7 @@ async function defaultStartup(claudeExtraArgs) {
 
 export {
   defaultStartup as startAll,
+  buildClaudeArgs,
   proxySubcommand as startProxy,
   statusSubcommand as statusProxy,
   stopSubcommand as stopProxy

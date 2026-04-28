@@ -59,8 +59,8 @@ Config:
     .description('Start only the local API proxy.')
     .addHelpText('after', `
 What it does:
-  Starts only the local Anthropic-compatible proxy. It does not open the
-  visualizer and does not launch Claude Code.
+  Starts only the local Anthropic-compatible proxy. It also writes a reusable
+  settings file for manually launching Claude Code through the proxy.
 
 When to use:
   Use this when you want the proxy running in the background and will start
