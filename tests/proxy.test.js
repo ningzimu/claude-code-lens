@@ -200,6 +200,57 @@ test('proxy preserves query strings and filters upstream length headers', async 
   assert.deepEqual(upstreamRequest.body.messages, [{ role: 'user', content: 'hello' }]);
 });
 
+test('proxy preserves target base path prefix when forwarding requests', async (t) => {
+  let upstreamRequest;
+  const upstream = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      upstreamRequest = {
+        url: req.url,
+        body: JSON.parse(body)
+      };
+
+      const responseBody = JSON.stringify({ ok: true, url: req.url });
+      res.writeHead(200, {
+        'Content-Type': 'application/json'
+      });
+      res.end(responseBody);
+    });
+  });
+  const upstreamPort = await listen(upstream);
+  t.after(() => closeServer(upstream));
+
+  const proxyPort = await freePort();
+  const monitorHome = await mkdtemp(path.join(os.tmpdir(), 'claude-monitor-base-path-test-'));
+  t.after(() => rm(monitorHome, { recursive: true, force: true }));
+
+  const child = spawn(process.execPath, [proxyPath], {
+    cwd: repoRoot,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      CLAUDE_CODE_LENS_HOME: monitorHome,
+      CLAUDE_CODE_LENS_PROXY_PORT: String(proxyPort),
+      CLAUDE_CODE_LENS_TARGET_BASE_URL: `http://127.0.0.1:${upstreamPort}/anthropic`
+    }
+  });
+  t.after(() => child.kill('SIGTERM'));
+
+  await waitForHttp(`http://127.0.0.1:${proxyPort}/__claude-code-lens/health`);
+
+  const response = await requestJson(
+    `http://127.0.0.1:${proxyPort}/v1/messages?beta=true`,
+    { stream: false, messages: [{ role: 'user', content: 'hello through prefixed upstream' }] }
+  );
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(upstreamRequest.url, '/anthropic/v1/messages?beta=true');
+  assert.deepEqual(upstreamRequest.body.messages, [{ role: 'user', content: 'hello through prefixed upstream' }]);
+});
+
 test('proxy groups logs by JSON metadata session_id', async (t) => {
   const upstream = http.createServer((req, res) => {
     req.resume();

@@ -48,6 +48,27 @@ function forwardResponseHeaders(proxyRes, res) {
   });
 }
 
+function joinUrlPath(basePath, requestPath) {
+  const normalizedBase = basePath && basePath !== '/'
+    ? basePath.replace(/\/+$/, '')
+    : '';
+  const normalizedRequest = requestPath.startsWith('/')
+    ? requestPath
+    : `/${requestPath}`;
+  return `${normalizedBase}${normalizedRequest}`;
+}
+
+function buildTargetUrl(originalUrl, baseUrl) {
+  const targetUrl = new URL(baseUrl);
+  const requestUrl = new URL(originalUrl, 'http://localhost');
+
+  targetUrl.pathname = joinUrlPath(targetUrl.pathname, requestUrl.pathname);
+  targetUrl.search = requestUrl.search;
+  targetUrl.hash = '';
+
+  return targetUrl;
+}
+
 const app = express();
 
 // 解析 JSON body (限制 100MB,支持大型请求)
@@ -141,7 +162,7 @@ async function proxyRequest(req, res) {
     loggerCtx.logInput(uid, req.body, reqInfo);
 
     // 构建目标 URL
-    const targetUrl = new URL(req.originalUrl, config.target.baseUrl);
+    const targetUrl = buildTargetUrl(req.originalUrl, config.target.baseUrl);
     const targetUrlString = targetUrl.toString();
 
     logger.info(`[${uid}] ${req.method} ${req.originalUrl} -> ${targetUrlString} (stream=${isStream})`);
