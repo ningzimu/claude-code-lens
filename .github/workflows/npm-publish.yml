@@ -42,6 +42,7 @@ jobs:
         run: npm run check
 
       - name: Run tests
+        timeout-minutes: 2
         run: npm test
 
       - name: Skip if version already exists
