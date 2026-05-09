@@ -266,11 +266,17 @@ test('visualizer builds download metadata for remote and local session logs', as
       input: {
         model: 'claude-sonnet',
         system: 'prompt_1',
-        messages: [{ role: 'user', content: 'Run mock task' }]
+        messages: [
+          { role: 'user', content: 'Earlier context should not repeat' },
+          { role: 'user', content: 'Run mock task' }
+        ]
       },
       result: {
         data: {
-          content: [{ type: 'text', text: 'Mock task complete' }],
+          content: [
+            { type: 'thinking', thinking: 'Consider the mock task context.' },
+            { type: 'text', text: 'Mock task complete' }
+          ],
           text: 'Mock task complete'
         }
       }
@@ -296,9 +302,46 @@ test('visualizer builds download metadata for remote and local session logs', as
   assert.equal(markdownInfo.fileName, 'claude-context-workspace_demo_project-mock-worker-2026-05-09.md');
   assert.match(markdownInfo.text, /# Previous Conversation Context/);
   assert.match(markdownInfo.text, /Current filter:\*\* Subagent: mock-worker/);
+  assert.match(markdownInfo.text, /## Conversation History/);
+  assert.match(markdownInfo.text, /### Message 1: User/);
+  assert.match(markdownInfo.text, /### Message 2: Assistant/);
   assert.match(markdownInfo.text, /Run mock task/);
+  assert.doesNotMatch(markdownInfo.text, /Earlier context should not repeat/);
+  assert.match(markdownInfo.text, /Thinking:/);
+  assert.match(markdownInfo.text, /Consider the mock task context/);
   assert.match(markdownInfo.text, /Mock task complete/);
+  assert.doesNotMatch(markdownInfo.text, /### System/);
+  assert.doesNotMatch(markdownInfo.text, /System prompt text/);
+  assert.doesNotMatch(markdownInfo.text, /Agent ID/);
+  assert.doesNotMatch(markdownInfo.text, /Confidence/);
+  assert.doesNotMatch(markdownInfo.text, /Model:/);
   assert.doesNotMatch(markdownInfo.text, /messages-20260429_032823-a72e23d4\.json"\s*:/);
+
+  const titleRequestInfo = resolveDownloadInfo({
+    currentLogUrl: '/logs/messages-20260429_032823-a72e23d4.json',
+    parsedData: {
+      session_title: 'Session a72e23d4',
+      prompts: { title_prompt: 'Generate a concise, sentence-case title. Return JSON with a single "title" field.' }
+    },
+    conversations: [{
+      uid: 'title-req',
+      started_at: '2026-05-09T10:00:00.000Z',
+      input: {
+        system: 'title_prompt',
+        messages: [{ role: 'user', content: 'Original user request' }]
+      },
+      result: {
+        data: {
+          content: [{ type: 'text', text: '{"title":"Demo task"}' }]
+        }
+      }
+    }],
+    agentFilter: 'lead',
+    date: new Date('2026-05-09T12:00:00.000Z')
+  });
+  assert.doesNotMatch(titleRequestInfo.text, /Original user request/);
+  assert.doesNotMatch(titleRequestInfo.text, /Demo task/);
+  assert.match(titleRequestInfo.text, /Messages in this export:\*\* 0/);
 
   assert.deepEqual(resolveDownloadInfo({
     currentLogUrl: '/logs/messages-20260429_032823-a72e23d4.json'
