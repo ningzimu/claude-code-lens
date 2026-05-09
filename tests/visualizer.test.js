@@ -250,6 +250,56 @@ test('visualizer builds download metadata for remote and local session logs', as
   await import(`${pathToFileURL(downloadCurrentLogPath).href}?cache=${Date.now()}`);
   const { resolveDownloadInfo } = globalThis.CCLensDownloadCurrentLog;
 
+  const markdownInfo = resolveDownloadInfo({
+    currentLogUrl: '/logs/messages-20260429_032823-a72e23d4.json',
+    parsedData: {
+      session_title: 'Session a72e23d4',
+      prompts: { prompt_1: 'System prompt text' }
+    },
+    conversations: [{
+      uid: 'req-1',
+      started_at: '2026-05-09T10:00:00.000Z',
+      agentRole: 'subagent',
+      agentName: 'mock-worker · Mock subagent task',
+      agentId: 'a04a',
+      agentConfidence: 'high',
+      input: {
+        model: 'claude-sonnet',
+        system: 'prompt_1',
+        messages: [{ role: 'user', content: 'Run mock task' }]
+      },
+      result: {
+        data: {
+          content: [{ type: 'text', text: 'Mock task complete' }],
+          text: 'Mock task complete'
+        }
+      }
+    }],
+    agentFilter: 'agent:a04a',
+    leadSubagentView: {
+      nativeTrace: {
+        nativeFile: '/tmp/mock-home/.claude/projects/-workspace-demo-project/session.jsonl'
+      },
+      agents: [{
+        id: 'a04a',
+        role: 'subagent',
+        description: 'Mock subagent task',
+        subagentType: 'mock-worker'
+      }]
+    },
+    date: new Date('2026-05-09T12:00:00.000Z')
+  });
+
+  assert.equal(markdownInfo.enabled, true);
+  assert.equal(markdownInfo.kind, 'blob');
+  assert.equal(markdownInfo.mimeType, 'text/markdown');
+  assert.equal(markdownInfo.fileName, 'claude-context-workspace_demo_project-mock-worker-2026-05-09.md');
+  assert.match(markdownInfo.text, /# Previous Conversation Context/);
+  assert.match(markdownInfo.text, /Current filter:\*\* Subagent: mock-worker/);
+  assert.match(markdownInfo.text, /Run mock task/);
+  assert.match(markdownInfo.text, /Mock task complete/);
+  assert.doesNotMatch(markdownInfo.text, /messages-20260429_032823-a72e23d4\.json"\s*:/);
+
   assert.deepEqual(resolveDownloadInfo({
     currentLogUrl: '/logs/messages-20260429_032823-a72e23d4.json'
   }), {

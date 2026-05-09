@@ -3629,7 +3629,11 @@
     function currentDownloadInfo() {
       return window.CCLensDownloadCurrentLog.resolveDownloadInfo({
         currentLogUrl: state.currentLogUrl,
-        localFile: getCurrentLocalFile()
+        localFile: getCurrentLocalFile(),
+        parsedData: state.data,
+        conversations: conversationsForCurrentFilter(),
+        agentFilter: state.agentFilter,
+        leadSubagentView: state.leadSubagentView
       });
     }
 
@@ -3644,7 +3648,7 @@
       link.download = info.fileName;
 
       if (info.kind === 'blob') {
-        const blob = new Blob([info.text], { type: 'application/json' });
+        const blob = new Blob([info.text], { type: info.mimeType || 'application/json' });
         const objectUrl = URL.createObjectURL(blob);
         link.href = objectUrl;
         document.body.appendChild(link);
