@@ -268,7 +268,10 @@ test('visualizer builds download metadata for remote and local session logs', as
         system: 'prompt_1',
         messages: [
           { role: 'user', content: 'Earlier context should not repeat' },
-          { role: 'user', content: 'Run mock task' }
+          {
+            role: 'user',
+            content: '<system-reminder>Hidden runtime reminder</system-reminder>\nRun mock task'
+          }
         ]
       },
       result: {
@@ -306,6 +309,8 @@ test('visualizer builds download metadata for remote and local session logs', as
   assert.match(markdownInfo.text, /### Message 1: User/);
   assert.match(markdownInfo.text, /### Message 2: Assistant/);
   assert.match(markdownInfo.text, /Run mock task/);
+  assert.doesNotMatch(markdownInfo.text, /system-reminder/);
+  assert.doesNotMatch(markdownInfo.text, /Hidden runtime reminder/);
   assert.doesNotMatch(markdownInfo.text, /Earlier context should not repeat/);
   assert.match(markdownInfo.text, /Thinking:/);
   assert.match(markdownInfo.text, /Consider the mock task context/);

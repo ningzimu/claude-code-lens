@@ -31,7 +31,10 @@
   }
 
   function markdownEscape(value) {
-    return String(value ?? '').replace(/\r\n/g, '\n');
+    return String(value ?? '')
+      .replace(/\r\n/g, '\n')
+      .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
+      .trim();
   }
 
   function resolvePromptRef(value, prompts = {}) {
