@@ -277,6 +277,23 @@
       gap: 4px;
       margin-left: auto;
     }
+    .agent-filter {
+      max-width: 260px;
+      min-width: 170px;
+      font: inherit;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text);
+      background: var(--surface-raised);
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      padding: 6px 28px 6px 10px;
+    }
+    .agent-filter:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-tint);
+    }
     .nav-btn {
       appearance: none;
       width: 30px; height: 30px;
@@ -556,6 +573,21 @@
       align-self: stretch;
       min-height: 60vh;
     }
+    #resourceRail.rail-right {
+      position: fixed;
+      top: 41px;
+      right: 0;
+      bottom: 0;
+      width: 44px;
+      max-height: calc(100vh - 41px);
+      overflow-y: auto;
+      z-index: 35;
+    }
+    #resourceRail.rail-right::-webkit-scrollbar { width: 6px; }
+    #resourceRail.rail-right::-webkit-scrollbar-thumb {
+      background: var(--line-strong);
+      border-radius: 999px;
+    }
     .rail-btn {
       position: relative;
       appearance: none;
@@ -621,26 +653,114 @@
       border-color: var(--accent-soft);
     }
     .rail-btn[data-empty="true"] .rail-count { display: none; }
+    .rail-separator {
+      width: 22px;
+      height: 1px;
+      margin: 4px auto;
+      background: var(--line);
+    }
+    .agent-rail-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .agent-rail-btn {
+      height: 34px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    .agent-rail-label {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .agent-rail-label svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+    .agent-rail-btn.agent-role-subagent {
+      color: var(--accent-deep);
+    }
+    .agent-rail-btn.agent-role-lead {
+      color: #2c5b35;
+    }
+    .agent-rail-btn.agent-role-unmatched {
+      color: var(--muted);
+    }
+    .agent-rail-btn.active {
+      background: var(--accent-tint);
+      color: var(--accent-deep);
+    }
     .rail-tooltip {
-      position: absolute;
-      right: calc(100% + 8px);
-      top: 50%;
-      transform: translateY(-50%) translateX(4px);
+      display: none;
+    }
+    .rail-hover-tooltip {
+      position: fixed;
       padding: 4px 8px;
       background: var(--text);
       color: #fbf8f1;
       font-size: 11px;
       font-weight: 500;
       border-radius: 4px;
-      white-space: nowrap;
+      white-space: pre;
+      text-align: left;
       opacity: 0;
       pointer-events: none;
+      transform: translateX(4px);
       transition: opacity .15s ease, transform .15s ease;
-      z-index: 5;
+      z-index: 80;
     }
-    .rail-btn:hover .rail-tooltip {
+    .rail-hover-tooltip.visible {
       opacity: 1;
-      transform: translateY(-50%) translateX(0);
+      transform: translateX(0);
+    }
+    .back-to-top-btn {
+      position: fixed;
+      right: 64px;
+      bottom: 24px;
+      width: 42px;
+      height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-deep);
+      background: var(--surface-raised);
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      box-shadow: var(--shadow-md);
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity .18s ease, transform .18s ease, background-color .15s ease;
+      z-index: 40;
+    }
+    .back-to-top-btn.visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .back-to-top-btn:hover {
+      background: var(--accent-tint);
+      border-color: var(--accent-soft);
+    }
+    .back-to-top-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
 
     /* Hide legacy header chrome — file picker moves to left panel */
@@ -1036,6 +1156,26 @@
       letter-spacing: 0.01em;
       padding: 3px 8px;
       font-weight: 500;
+    }
+    .agent-badge.agent-role-lead {
+      background: var(--green-soft);
+      color: #2c5b35;
+      border-color: rgba(63,122,74,.25);
+    }
+    .agent-badge.agent-role-subagent {
+      background: var(--accent-tint);
+      color: var(--accent-deep);
+      border-color: var(--accent-soft);
+    }
+    .agent-badge.agent-confidence-low {
+      background: var(--amber-soft);
+      color: var(--amber);
+      border-color: rgba(168,106,26,.25);
+    }
+    .agent-badge.agent-role-unmatched {
+      background: var(--surface-soft);
+      color: var(--muted);
+      border-color: var(--line);
     }
     .tag {
       background: var(--paper);
@@ -1960,11 +2100,18 @@
             <span class="rail-count" id="railPromptsCount">0</span>
             <span class="rail-tooltip">All prompts</span>
           </button>
+          <div class="rail-separator" aria-hidden="true"></div>
+          <div id="agentRailList" class="agent-rail-list" aria-label="Lead and subagent filters"></div>
         </div>
 
       </div>
     </div>
   </main>
+
+  <button id="backToTopBtn" class="back-to-top-btn" type="button" aria-label="Back to top" title="Back to top">
+    <svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+  </button>
+  <div id="railHoverTooltip" class="rail-hover-tooltip" role="tooltip" aria-hidden="true"></div>
 
   <!-- Modal -->
   <div id="modal" class="modal" role="dialog" aria-modal="true" aria-hidden="true">
@@ -1997,7 +2144,9 @@
       toolKeysByName: new Map(),// tool name -> [keys]
       systemPromptIds: new Set(),
       extraPromptCounts: {},    // counts only for user messages whose resolved text starts with <system-reminder>
-      resourceView: 'tools'
+      resourceView: 'tools',
+      leadSubagentView: null,
+      agentFilter: 'all'
     };
 
     // -------- Element refs --------
@@ -2016,6 +2165,9 @@
     const lastBtn = el('lastBtn');
     const pageInput = el('pageInput');
     const totalLabel = el('totalLabel');
+    const agentRailList = el('agentRailList');
+    const backToTopBtn = el('backToTopBtn');
+    const railHoverTooltip = el('railHoverTooltip');
     const convHeader = el('convHeader');
     const workspaceGrid = el('ideShell');
     const resourceActions = el('resourceActions');
@@ -2377,6 +2529,191 @@
         state.toolKeysByName.set(name, arr);
       });
       state.systemPromptIds = collectSystemPromptIds(data);
+    }
+
+    function emptyLeadSubagentView(reason = 'not-loaded') {
+      return {
+        nativeTrace: {
+          found: false,
+          reason
+        },
+        agents: [],
+        assignments: {},
+        stats: {
+          totalRequests: 0,
+          highConfidence: 0,
+          lowConfidence: 0,
+          unmatched: 0
+        }
+      };
+    }
+
+    function remoteLogName(url) {
+      if (typeof url !== 'string' || !url.startsWith('/logs/')) return null;
+      return url.split('/').pop() || null;
+    }
+
+    async function fetchLeadSubagentView(url) {
+      const logName = remoteLogName(url);
+      if (!logName) return emptyLeadSubagentView('local-file');
+
+      try {
+        const response = await fetch(`/api/lead-subagent-view?log=${encodeURIComponent(logName)}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+      } catch (err) {
+        console.warn('[Visualizer] Failed to load lead/subagent view:', err);
+        return emptyLeadSubagentView('api-error');
+      }
+    }
+
+    function applyLeadSubagentView(data, view) {
+      state.leadSubagentView = view || emptyLeadSubagentView('empty');
+      const assignments = state.leadSubagentView.assignments || {};
+
+      (data?.conversations || []).forEach(conv => {
+        const assignment = assignments[conv.uid];
+        conv.agentId = assignment?.agentId || 'unmatched';
+        conv.agentName = assignment?.agentName || 'Unmatched';
+        conv.agentRole = assignment?.agentRole || 'unmatched';
+        conv.agentConfidence = assignment?.confidence || 'unmatched';
+        conv.agentMatchReason = assignment?.matchReason || 'not-attributed';
+      });
+    }
+
+    function conversationsForCurrentFilter() {
+      const conversations = state.data?.conversations || [];
+      if (state.agentFilter === 'all') return conversations;
+      if (state.agentFilter === 'lead') {
+        return conversations.filter(conv => conv.agentRole === 'lead');
+      }
+      if (state.agentFilter === 'unmatched') {
+        return conversations.filter(conv => conv.agentRole === 'unmatched' || !conv.agentId);
+      }
+      if (state.agentFilter?.startsWith('agent:')) {
+        const agentId = state.agentFilter.slice('agent:'.length);
+        return conversations.filter(conv => conv.agentId === agentId);
+      }
+      return conversations;
+    }
+
+    function countForFilter(value) {
+      const previous = state.agentFilter;
+      state.agentFilter = value;
+      const count = conversationsForCurrentFilter().length;
+      state.agentFilter = previous;
+      return count;
+    }
+
+    function renderLeadSubagentFilter() {
+      if (!agentRailList) return;
+      const previous = state.agentFilter || 'all';
+      const view = state.leadSubagentView || emptyLeadSubagentView('empty');
+      const agents = Array.isArray(view.agents) ? view.agents : [];
+      const options = [{
+        value: 'all',
+        label: 'All',
+        role: 'all',
+        count: countForFilter('all'),
+        tooltip: `All agents\nrequests: ${countForFilter('all')}`
+      }];
+
+      if (agents.some(agent => agent.role === 'lead')) {
+        options.push({
+          value: 'lead',
+          label: 'Lead',
+          role: 'lead',
+          count: countForFilter('lead'),
+          tooltip: `description: Lead agent\nsubagent_type: n/a\nrequests: ${countForFilter('lead')}`
+        });
+      }
+
+      agents
+        .filter(agent => agent.role === 'subagent')
+        .forEach((agent, index) => {
+          const value = `agent:${agent.id}`;
+          const count = countForFilter(value);
+          const description = agent.description || agent.name || agent.id;
+          const subagentType = agent.subagentType || '(unknown)';
+          options.push({
+            value,
+            label: `S${index + 1}`,
+            role: 'subagent',
+            count,
+            tooltip: `description: ${description}\nsubagent_type: ${subagentType}\nagentId: ${agent.id}\nrequests: ${count}`
+          });
+        });
+
+      const unmatchedCount = countForFilter('unmatched');
+      if (unmatchedCount > 0 || view.nativeTrace?.found) {
+        options.push({
+          value: 'unmatched',
+          label: 'U',
+          role: 'unmatched',
+          count: unmatchedCount,
+          tooltip: `description: Unmatched requests\nsubagent_type: n/a\nrequests: ${unmatchedCount}`
+        });
+      }
+
+      agentRailList.innerHTML = '';
+      function agentRailIcon(role) {
+        if (role === 'lead') {
+          return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>';
+        }
+        if (role === 'subagent') {
+          return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="3"/><circle cx="18" cy="7" r="3"/><circle cx="12" cy="17" r="3"/><path d="M8.5 9.2 11 14"/><path d="M15.5 9.2 13 14"/></svg>';
+        }
+        if (role === 'unmatched') {
+          return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 9a3 3 0 1 1 5.4 1.8c-1.7 1.1-2.6 1.9-2.6 3.2"/><path d="M12 18h.01"/></svg>';
+        }
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>';
+      }
+      options.forEach(option => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `rail-btn agent-rail-btn agent-role-${option.role}`;
+        button.dataset.agentFilter = option.value;
+        button.dataset.empty = option.count === 0 ? 'true' : 'false';
+        button.classList.toggle('active', option.value === previous);
+        button.setAttribute('aria-label', option.tooltip.replace(/\n/g, '; '));
+        const label = document.createElement('span');
+        label.className = 'agent-rail-label';
+        label.innerHTML = agentRailIcon(option.role);
+        const count = document.createElement('span');
+        count.className = 'rail-count';
+        count.textContent = String(option.count);
+        const tooltip = document.createElement('span');
+        tooltip.className = 'rail-tooltip';
+        tooltip.textContent = option.tooltip;
+        button.appendChild(label);
+        button.appendChild(count);
+        button.appendChild(tooltip);
+        button.addEventListener('click', () => {
+          state.agentFilter = option.value;
+          renderLeadSubagentFilter();
+          setIndex(0);
+        });
+        agentRailList.appendChild(button);
+      });
+
+      state.agentFilter = options.some(option => option.value === previous) ? previous : 'all';
+      agentRailList.querySelectorAll('[data-agent-filter]').forEach(button => {
+        button.classList.toggle('active', button.dataset.agentFilter === state.agentFilter);
+        button.disabled = !state.data || options.length <= 1;
+      });
+    }
+
+    function agentBadge(conv) {
+      const role = conv.agentRole || 'unmatched';
+      const confidence = conv.agentConfidence || 'unmatched';
+      const label = role === 'lead'
+        ? 'Lead'
+        : role === 'subagent'
+          ? `Subagent:${conv.agentName || conv.agentId}`
+          : 'Unmatched';
+      const badge = pill(`${label} · ${confidence}`, conv.agentMatchReason || '', null, `badge agent-badge agent-role-${role} agent-confidence-${confidence}`);
+      badge.removeAttribute('href');
+      return badge;
     }
 
     // -------- Resource panel --------
@@ -2929,6 +3266,7 @@
 
       // Header meta tags (Model, Tokens, etc.)
       convHeader.innerHTML = '';
+      convHeader.appendChild(agentBadge(conv));
       const model = input.model || '(model)';
       // Model pill
       convHeader.appendChild(pill(model, 'Model Name', null, 'badge'));
@@ -3065,6 +3403,7 @@
     function renderOutput(conv) {
       outputPanel.innerHTML = '';
       outputHeader.innerHTML = ''; // Clear header
+      outputHeader.appendChild(agentBadge(conv));
 
       const result = conv.result || {};
       const type = result.type || '';
@@ -3159,10 +3498,19 @@
 
     // -------- Navigation --------
     function setIndex(i) {
-      const total = (state.data?.conversations || []).length;
+      const visibleConversations = conversationsForCurrentFilter();
+      const total = visibleConversations.length;
       if (total === 0) {
         pageInput.value = 0;
         totalLabel.textContent = ' / 0';
+        firstBtn.disabled = true;
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        lastBtn.disabled = true;
+        inputPanel.innerHTML = '';
+        outputPanel.innerHTML = '';
+        convHeader.innerHTML = '';
+        outputHeader.innerHTML = '';
         return;
       }
       state.index = Math.max(0, Math.min(i, total - 1));
@@ -3175,7 +3523,7 @@
       pageInput.value = state.index + 1;
       totalLabel.textContent = ` / ${total}`;
 
-      const conv = state.data.conversations[state.index];
+      const conv = visibleConversations[state.index];
       renderInput(conv);
       renderOutput(conv);
       saveCurrentLogIndex();
@@ -3184,7 +3532,7 @@
     firstBtn.onclick = () => setIndex(0);
     prevBtn.onclick = () => setIndex(state.index - 1);
     nextBtn.onclick = () => setIndex(state.index + 1);
-    lastBtn.onclick = () => setIndex((state.data?.conversations || []).length - 1);
+    lastBtn.onclick = () => setIndex(conversationsForCurrentFilter().length - 1);
 
     pageInput.addEventListener('change', () => {
       let val = parseInt(pageInput.value, 10);
@@ -3281,7 +3629,11 @@
     function currentDownloadInfo() {
       return window.CCLensDownloadCurrentLog.resolveDownloadInfo({
         currentLogUrl: state.currentLogUrl,
-        localFile: getCurrentLocalFile()
+        localFile: getCurrentLocalFile(),
+        parsedData: state.data,
+        conversations: conversationsForCurrentFilter(),
+        agentFilter: state.agentFilter,
+        leadSubagentView: state.leadSubagentView
       });
     }
 
@@ -3296,7 +3648,7 @@
       link.download = info.fileName;
 
       if (info.kind === 'blob') {
-        const blob = new Blob([info.text], { type: 'application/json' });
+        const blob = new Blob([info.text], { type: info.mimeType || 'application/json' });
         const objectUrl = URL.createObjectURL(blob);
         link.href = objectUrl;
         document.body.appendChild(link);
@@ -3467,9 +3819,12 @@
         const json = window.parseConversationLog(text);
         console.log(json);
 
+        state.agentFilter = 'all';
+        applyLeadSubagentView(json, await fetchLeadSubagentView(url));
         state.data = json;
         buildMaps(json);
         renderResources();
+        renderLeadSubagentFilter();
 
         const total = (json.conversations || []).length;
         metaInfoEl.textContent = '';
@@ -3505,9 +3860,12 @@
 
         const json = window.parseConversationLog(file.text);
         fileNameEl.textContent = file.name;
+        state.agentFilter = 'all';
+        applyLeadSubagentView(json, emptyLeadSubagentView('local-file'));
         state.data = json;
         buildMaps(json);
         renderResources();
+        renderLeadSubagentFilter();
 
         const total = (json.conversations || []).length;
         metaInfoEl.textContent = '';
@@ -3661,9 +4019,12 @@
         console.log(json)
 
         const localValue = addLocalFileOption(file.name, text);
+        state.agentFilter = 'all';
+        applyLeadSubagentView(json, emptyLeadSubagentView('local-file'));
         state.data = json;
         buildMaps(json);
         renderResources();
+        renderLeadSubagentFilter();
 
         const total = (json.conversations || []).length;
         metaInfoEl.textContent = '';
@@ -3690,7 +4051,72 @@
     });
 
     // Initialize empty states
+    state.leadSubagentView = emptyLeadSubagentView('initial');
     renderResources();
+    renderLeadSubagentFilter();
+
+    function syncBackToTopButton() {
+      if (!backToTopBtn) return;
+      backToTopBtn.classList.toggle('visible', window.scrollY > 360);
+    }
+
+    if (backToTopBtn) {
+      backToTopBtn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+      window.addEventListener('scroll', syncBackToTopButton, { passive: true });
+      syncBackToTopButton();
+    }
+
+    function showRailHoverTooltip(trigger) {
+      if (!railHoverTooltip || !trigger) return;
+      const source = trigger.querySelector('.rail-tooltip');
+      const text = source?.textContent?.trim() || trigger.getAttribute('aria-label');
+      if (!text) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const opensRight = Boolean(trigger.closest('.rail-left'));
+      const x = opensRight ? rect.right + 8 : rect.left - 8;
+      const transformHidden = opensRight
+        ? 'translate(0, -50%) translateX(-4px)'
+        : 'translate(-100%, -50%) translateX(4px)';
+      const transformVisible = opensRight
+        ? 'translate(0, -50%) translateX(0)'
+        : 'translate(-100%, -50%) translateX(0)';
+      railHoverTooltip.textContent = text;
+      railHoverTooltip.style.position = 'fixed';
+      railHoverTooltip.style.left = `${Math.max(8, x)}px`;
+      railHoverTooltip.style.top = `${rect.top + rect.height / 2}px`;
+      railHoverTooltip.style.transform = transformHidden;
+      railHoverTooltip.setAttribute('aria-hidden', 'false');
+      railHoverTooltip.classList.add('visible');
+      railHoverTooltip.style.transform = transformVisible;
+    }
+
+    function hideRailHoverTooltip() {
+      if (!railHoverTooltip) return;
+      railHoverTooltip.classList.remove('visible');
+      railHoverTooltip.setAttribute('aria-hidden', 'true');
+    }
+
+    document.addEventListener('mouseover', event => {
+      const trigger = event.target.closest?.('.rail-btn');
+      if (trigger) showRailHoverTooltip(trigger);
+    });
+    document.addEventListener('mouseout', event => {
+      const trigger = event.target.closest?.('.rail-btn');
+      if (trigger && !trigger.contains(event.relatedTarget)) hideRailHoverTooltip();
+    });
+    document.addEventListener('focusin', event => {
+      const trigger = event.target.closest?.('.rail-btn');
+      if (trigger) showRailHoverTooltip(trigger);
+    });
+    document.addEventListener('focusout', event => {
+      const trigger = event.target.closest?.('.rail-btn');
+      if (trigger) hideRailHoverTooltip();
+    });
+    window.addEventListener('scroll', hideRailHoverTooltip, { passive: true });
+    window.addEventListener('resize', hideRailHoverTooltip);
 
     // -------- VSCode-style activity rail --------
     (function setupRail() {

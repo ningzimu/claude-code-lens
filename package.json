@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "node --check bin/cclens.js && node --check src/cli/service.js && node --check src/config/env.js && node --check src/config/target-discovery.js && node --check src/proxy/config.js && node --check src/proxy/server.js && node --check src/visualizer/server.js && node --check src/extractor/index.js && node --check src/extractor/cli.js"
+    "check": "node --check bin/cclens.js && node --check src/cli/service.js && node --check src/config/env.js && node --check src/config/target-discovery.js && node --check src/proxy/config.js && node --check src/proxy/server.js && node --check src/visualizer/server.js && node --check src/visualizer/lead-subagent-trace.js && node --check src/extractor/index.js && node --check src/extractor/cli.js"
   },
   "files": [
     "assets/",

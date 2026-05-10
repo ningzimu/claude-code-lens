@@ -6,9 +6,10 @@ import { spawn, execSync } from 'child_process';
 import { existsSync, readFileSync, watch } from 'fs';
 import { createServer, get } from 'http';
 import { readFile, readdir, stat } from 'fs/promises';
-import { extname } from 'path';
+import { basename, extname } from 'path';
 import { homedir } from 'os';
 import { parseInteger, readEnv } from '../config/env.js';
+import { buildLeadSubagentView } from './lead-subagent-trace.js';
 
 // Check if running as background server
 const IS_BACKGROUND_SERVER = (
@@ -66,6 +67,8 @@ const __dirname = dirname(__filename);
 const VISUALIZER_DIR = join(__dirname, 'public');
 
 const LOGS_DIR = join(APP_HOME, 'raw_logs');
+const CLAUDE_PROJECTS_DIR = readEnv(process.env, 'CLAUDE_CODE_LENS_CLAUDE_PROJECTS_DIR') ||
+  join(homedir(), '.claude', 'projects');
 
 // MIME types
 const MIME_TYPES = {
@@ -194,6 +197,11 @@ function portPids(port) {
   }
 }
 
+function writeJson(res, statusCode, body) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(body));
+}
+
 // Start built-in HTTP server
 async function startBuiltinServer() {
   // Only show startup messages if running as background server
@@ -280,6 +288,33 @@ async function startBuiltinServer() {
       } catch (err) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ logs: [], error: err.message, debugPath: LOGS_DIR }));
+      }
+      return;
+    }
+
+    if (req.url.startsWith('/api/lead-subagent-view')) {
+      try {
+        const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
+        const logName = parsedUrl.searchParams.get('log') || '';
+
+        if (!logName || basename(logName) !== logName || !logName.endsWith('.json')) {
+          writeJson(res, 400, { error: 'Invalid log parameter' });
+          return;
+        }
+
+        const logPath = join(LOGS_DIR, logName);
+        const logData = JSON.parse(await readFile(logPath, 'utf8'));
+        const view = await buildLeadSubagentView(logData, {
+          projectsDir: CLAUDE_PROJECTS_DIR
+        });
+
+        writeJson(res, 200, view);
+      } catch (err) {
+        if (err.code === 'ENOENT') {
+          writeJson(res, 404, { error: 'Log not found' });
+        } else {
+          writeJson(res, 500, { error: err.message });
+        }
       }
       return;
     }
