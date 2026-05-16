@@ -49,23 +49,8 @@ test('cclens passthrough uses the generated monitor settings file by default', (
   );
 });
 
-test('local proxy base URL preserves only the DeepSeek Anthropic path', () => {
-  assert.equal(
-    buildLocalProxyBaseUrl(18888, 'https://api.deepseek.com/anthropic'),
-    'http://localhost:18888/anthropic'
-  );
-  assert.equal(
-    buildLocalProxyBaseUrl(18888, 'https://api.deepseek.com/anthropic/'),
-    'http://localhost:18888/anthropic'
-  );
-  assert.equal(
-    buildLocalProxyBaseUrl(18888, 'https://api.anthropic.com'),
-    'http://localhost:18888'
-  );
-  assert.equal(
-    buildLocalProxyBaseUrl(18888, 'https://third-party.example.com/anthropic'),
-    'http://localhost:18888'
-  );
+test('local proxy base URL stays a unified local origin', () => {
+  assert.equal(buildLocalProxyBaseUrl(18888), 'http://localhost:18888');
 });
 
 test('monitor subcommands provide detailed help', async () => {

@@ -255,7 +255,7 @@ test('proxy preserves target base path prefix when forwarding requests', async (
       ...process.env,
       CLAUDE_CODE_LENS_HOME: monitorHome,
       CLAUDE_CODE_LENS_PROXY_PORT: String(proxyPort),
-      CLAUDE_CODE_LENS_TARGET_BASE_URL: `http://127.0.0.1:${upstreamPort}/anthropic`
+      CLAUDE_CODE_LENS_TARGET_BASE_URL: `http://127.0.0.1:${upstreamPort}/proxy/anthropic/`
     }
   });
   t.after(() => terminateChild(child));
@@ -268,7 +268,7 @@ test('proxy preserves target base path prefix when forwarding requests', async (
   );
 
   assert.equal(response.statusCode, 200);
-  assert.equal(upstreamRequest.url, '/anthropic/v1/messages?beta=true');
+  assert.equal(upstreamRequest.url, '/proxy/anthropic/v1/messages?beta=true');
   assert.deepEqual(upstreamRequest.body.messages, [{ role: 'user', content: 'hello through prefixed upstream' }]);
 });
 

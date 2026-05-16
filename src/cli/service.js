@@ -408,7 +408,7 @@ async function proxySubcommand() {
   // Verify startup
   if (isReady && isProcessRunning(child.pid)) {
     // Update settings.json with current port
-    updateSettingsFile(buildLocalProxyBaseUrl(port, target.baseUrl));
+    updateSettingsFile(buildLocalProxyBaseUrl(port));
 
     console.log('');
     console.log(`${colors.green}✅ 代理服务器启动成功!${colors.reset}`);
@@ -888,21 +888,8 @@ async function startVisualizer() {
 /**
  * Update settings.json with current proxy port
  */
-function deepSeekProxyPath(targetBaseUrl) {
-  try {
-    const parsed = new URL(targetBaseUrl);
-    const pathName = parsed.pathname.replace(/\/+$/, '');
-    if (parsed.hostname.toLowerCase() === 'api.deepseek.com' && pathName === '/anthropic') {
-      return '/anthropic';
-    }
-  } catch (e) {
-    // Ignore invalid target URLs and keep the generic proxy URL.
-  }
-  return '';
-}
-
-function buildLocalProxyBaseUrl(port, targetBaseUrl) {
-  return `http://localhost:${port}${deepSeekProxyPath(targetBaseUrl)}`;
+function buildLocalProxyBaseUrl(port) {
+  return `http://localhost:${port}`;
 }
 
 function updateSettingsFile(proxyUrl) {
@@ -1091,7 +1078,7 @@ async function defaultStartup(claudeExtraArgs) {
 
     // Step 2: Start proxy server
     verboseLog(`${colors.cyan}[2/4]${colors.reset} Starting proxy...`);
-    const proxyUrl = buildLocalProxyBaseUrl(port, target.baseUrl);
+    const proxyUrl = buildLocalProxyBaseUrl(port);
     let proxyInfo;
 
     if (existingProxyReady) {
